@@ -7,7 +7,7 @@ pub(crate) struct DroppedFiles {
     pub paths: Vec<std::path::PathBuf>,
     pub bytes: Vec<Vec<u8>>,
 }
-pub(crate) struct NativeDisplayData {
+pub struct NativeDisplayData {
     pub screen_width: i32,
     pub screen_height: i32,
     pub screen_position: (u32, u32),

@@ -3,7 +3,7 @@ pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
-mod native;
+pub mod native;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
@@ -82,17 +82,38 @@ pub type Context = dyn RenderingBackend;
 
 use std::sync::{Mutex, OnceLock};
 
-static NATIVE_DISPLAY: OnceLock<Mutex<native::NativeDisplayData>> = OnceLock::new();
+static mut OWNED_NATIVE_DISPLAY: Option<native::NativeDisplayData> = None;
+static mut OWNED_NATIVE_DISPLAY_MUTEX: Option<Mutex<&'static mut native::NativeDisplayData>> = None;
+static mut NATIVE_DISPLAY: OnceLock<&'static Mutex<&'static mut native::NativeDisplayData>> = OnceLock::new();
 
-fn set_display(display: native::NativeDisplayData) {
-    NATIVE_DISPLAY
-        .set(Mutex::new(display))
-        .unwrap_or_else(|_| panic!("NATIVE_DISPLAY already set"));
+pub fn reuse_display(display: &'static Mutex<&'static mut native::NativeDisplayData>) {
+    unsafe {
+        if NATIVE_DISPLAY.get().is_some() {
+            return;
+        }
+
+        NATIVE_DISPLAY
+            .set(display)
+            .unwrap_or_else(|_| panic!("NATIVE_DISPLAY already set"));
+    }
 }
-fn native_display() -> &'static Mutex<native::NativeDisplayData> {
-    NATIVE_DISPLAY
+
+pub fn native_display() -> &'static Mutex<&'static mut native::NativeDisplayData> {
+    unsafe {
+        NATIVE_DISPLAY
         .get()
         .expect("Backend has not initialized NATIVE_DISPLAY yet.") //|| Mutex::new(Default::default()))
+    }
+}
+
+fn set_display(display: native::NativeDisplayData) {
+    unsafe {
+        OWNED_NATIVE_DISPLAY = Some(display);
+        OWNED_NATIVE_DISPLAY_MUTEX = Some(Mutex::new(OWNED_NATIVE_DISPLAY.as_mut().unwrap()));
+        NATIVE_DISPLAY
+            .set(OWNED_NATIVE_DISPLAY_MUTEX.as_ref().unwrap())
+            .unwrap_or_else(|_| panic!("NATIVE_DISPLAY already set"));
+    };
 }
 
 /// Window and associated to window rendering context related functions.
